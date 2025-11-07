@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ORIGIN TD — PWA Edition (All-Original)</title>
+  <link rel="manifest" id="manifestLink">
+  <style>
+    :root{
+      --bg:#0f1223; --panel:#171a2e; --accent:#72f5a0; --text:#e6e8ef; --muted:#8b90a8;
+      --danger:#ff6b6b; --gold:#ffd66b;
+    }
+    *{box-sizing:border-box; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial}
+    body{margin:0; background:linear-gradient(180deg,#0b0e1c,#0f1223); color:var(--text); display:flex; height:100vh;}
+    #left{flex:1; display:flex; align-items:center; justify-content:center;}
+    #right{width:380px; background:var(--panel); border-left:1px solid #1f2340; padding:12px; display:flex; flex-direction:column; gap:12px}
+    canvas{background:radial-gradient(ellipse at center, #102033 0%, #0b1120 70%); border:1px solid #1e2a44; border-radius:12px; box-shadow:0 0 0 1px #1e2a44, 0 10px 30px rgba(0,0,0,.45)}
+    h1{font-size:18px; margin:0; letter-spacing:.5px}
+    .row{display:flex; align-items:center; gap:8px}
+    .stat{display:flex; align-items:center; gap:6px; padding:6px 8px; background:#12162a; border:1px solid #1f2442; border-radius:8px}
+    .stat b{color:var(--accent)}
+    .button{background:#12162a; border:1px solid #293055; border-radius:10px; padding:8px 10px; cursor:pointer; color:var(--text); transition:.15s}
+    .button:hover{transform:translateY(-1px); box-shadow:0 6px 16px rgba(0,0,0,.3)}
+    .button[disabled]{opacity:.5; cursor:not-allowed}
+    .shop{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+    .card{background:#101428; border:1px solid #232a4a; border-radius:12px; padding:8px}
+    .title{font-size:13px; color:#cfd3e6; margin-bottom:6px}
+    .desc{font-size:12px; color:var(--muted); min-height:30px}
+    .price{font-size:12px; color:var(--gold)}
+    .footer{margin-top:auto; font-size:12px; color:var(--muted)}
+    .log{height:120px; overflow:auto; background:#0e1326; border:1px solid #1b2244; border-radius:10px; padding:8px; font-size:12px}
+    .pill{padding:2px 6px; border:1px solid #2d3560; border-radius:999px; font-size:12px; color:#cbd0ea}
+    .hint{font-size:12px; color:#aab1d5}
+    .modal{position:fixed; inset:0; background:rgba(6,8,18,.7); display:flex; align-items:center; justify-content:center}
+    .modal > div{background:#111735; border:1px solid #24305d; border-radius:14px; padding:16px; width:560px}
+    .gridHint{font-size:12px; color:#9aa1c8;}
+    .two{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+    .kbd{padding:2px 6px; border:1px solid #3a4274; border-radius:6px; font-size:12px; color:#cbd0ea}
+    .skill{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; border:1px solid #293055; border-radius:10px; background:#0e1432}
+  </style>
+</head>
+<body>
+  <div id="left">
+    <canvas id="game" width="960" height="600"></canvas>
+  </div>
+  <aside id="right">
+    <div class="row" style="justify-content:space-between">
+      <h1>ORIGIN TD</h1>
+      <span class="pill" id="ver"></span>
+    </div>
+
+    <div class="row" style="gap:10px; flex-wrap:wrap">
+      <div class="stat">💰 Gold: <b id="gold">0</b></div>
+      <div class="stat">❤️ Base HP: <b id="hp">20</b></div>
+      <div class="stat">🌊 Wave: <b id="wave">0</b></div>
+      <div class="stat">⚙️ FPS: <b id="fps">0</b></div>
+    </div>
+
+    <div class="row" style="gap:8px; flex-wrap:wrap">
+      <button class="button" id="btnStart">Start Wave</button>
+      <button class="button" id="btnSave">Save</button>
+      <button class="button" id="btnLoad">Load</button>
+      <button class="button" id="btnNew">New</button>
+      <button class="button" id="btnMusic">Music: Off</button>
+    </div>
+
+    <div class="gridHint">Left-click: place/select • Right-click: cancel • <span class="kbd">U</span> upgrade • <span class="kbd">S</span> sell • Drag hero to move • Map Editor in Menu</div>
+
+    <div class="card">
+      <div class="title">Build Menu</div>
+      <div class="shop" id="shop"></div>
+      <div class="footer hint">Traps can be placed on the path tiles.</div>
+    </div>
+
+    <div class="card">
+      <div class="title">Selected</div>
+      <div id="selected" class="desc">Nothing selected.</div>
+      <div class="row">
+        <button id="btnUpgrade" class="button">Upgrade (U)</button>
+        <button id="btnSell" class="button">Sell (S)</button>
+      </div>
+    </div>
+
+    <div class="two">
+      <div class="card">
+        <div class="title">Difficulty</div>
+        <div class="row" style="flex-wrap:wrap">
+          <button class="button diff" data-d="easy">Easy</button>
+          <button class="button diff" data-d="normal">Normal</button>
+          <button class="button diff" data-d="hard">Hard</button>
+          <span class="hint" id="diffLabel"></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="title">Skills (<span id="skillPts">0</span> pts)</div>
+        <div id="skills"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">Map Tools</div>
+      <div class="row" style="flex-wrap:wrap">
+        <button class="button" id="btnEditor">Open Map Editor</button>
+        <button class="button" id="btnRandMap">Random Path</button>
+        <button class="button" id="btnNextMap">Next Map</button>
+      </div>
+      <div class="hint">Multiple maps supported. Editor lets you draw a new path and save.</div>
+    </div>
+
+    <div class="card">
+      <div class="title">Event Log</div>
+      <div id="log" class="log"></div>
+    </div>
+
+    <div class="hint">All characters and visuals here are 100% original, geometric, and non-derivative.</div>
+  </aside>
+
+  <!-- Intro / Menu Modal -->
+  <div class="modal" id="intro">
+    <div>
+      <h2 style="margin:0 0 6px 0">Welcome to ORIGIN TD — PWA Edition</h2>
+      <p style="margin:0 0 12px 0; color:#cdd2ea">Features: sound & music, 9 tower types, difficulty modes, skill tree, multi-map & editor, and offline install.</p>
+      <div class="row" style="gap:8px; flex-wrap:wrap">
+        <button class="button" id="continueBtn">Continue</button>
+        <button class="button" id="newBtn">Start New Game</button>
+        <button class="button" id="installBtn">Install (PWA)</button>
+        <button class="button" id="openEditorBtn">Map Editor</button>
+      </div>
+      <p class="hint" style="margin-top:12px">Music starts after your first button press (browser policy).</p>
+    </div>
+  </div>
+
+  <!-- Map Editor Modal -->
+  <div class="modal" id="editorModal" style="display:none">
+    <div>
+      <h3 style="margin:0 0 8px 0">Map Editor</h3>
+      <p class="hint">Click to add waypoints. Drag to move. Right-click to delete. Start is leftmost, End is rightmost.</p>
+      <div class="row" style="gap:8px; flex-wrap:wrap; margin-bottom:6px">
+        <button class="button" id="edDone">Done</button>
+        <button class="button" id="edClear">Clear</button>
+        <button class="button" id="edLoad">Load Saved</button>
+        <button class="button" id="edSave">Save Path</button>
+        <button class="button" id="edRandom">Random Path</button>
+      </div>
+      <canvas id="editorCanvas" width="720" height="360" style="background:#0c1228; border:1px solid #23305a; border-radius:10px"></canvas>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    const VERSION = '2.0.0';
+    const SAVE_KEY = 'origin_td_save_v2';
+    const MAPS_KEY = 'origin_td_maps_v1';
+
+    document.getElementById('ver').textContent = 'v'+VERSION;
+
+    // ====== Basic Canvas/Grid ======
+    const cvs = document.getElementById('game');
+    const ctx = cvs.getContext('2d');
+    const UI = (id)=>document.getElementById(id);
+    const TILE = 30; const COLS = Math.floor(cvs.width / TILE); const ROWS = Math.floor(cvs.height / TILE);
+
+    // ====== Audio (WebAudio minimal) ======
+    let audioCtx = null; let musicOn=false; let musicNode=null; let masterGain=null;
+    function initAudio(){ if(audioCtx) return; audioCtx = new (window.AudioContext||window.webkitAudioContext)(); masterGain = audioCtx.createGain(); masterGain.gain.value = 0.25; masterGain.connect(audioCtx.destination); }
+    function beep(freq=440, dur=0.08){ if(!audioCtx||!musicOn) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type='square'; o.frequency.value=freq; g.gain.setValueAtTime(0.15, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+dur); o.connect(g); g.connect(masterGain); o.start(); o.stop(audioCtx.currentTime+dur); }
+    function noiseHit(){ if(!audioCtx||!musicOn) return; const n = audioCtx.createBufferSource(); const len=audioCtx.sampleRate*0.12; const buf=audioCtx.createBuffer(1,len,audioCtx.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<len;i++){ d[i]=(Math.random()*2-1)*Math.exp(-i/600);} n.buffer=buf; const g=audioCtx.createGain(); g.gain.value=0.25; n.connect(g); g.connect(masterGain); n.start(); }
+    function startMusic(){ if(!audioCtx) initAudio(); if(musicNode) return; // simple arpeggio loop
+      const o1=audioCtx.createOscillator(), o2=audioCtx.createOscillator(); const g=audioCtx.createGain(); g.gain.value=0.06; o1.type='triangle'; o2.type='sine'; o1.connect(g); o2.connect(g); g.connect(masterGain); let base=220; let step=0; function tick(){ if(!musicOn){ try{o1.stop(); o2.stop();}catch{}; return;} step=(step+1)%16; const notes=[0,3,5,7,10,12]; const n=notes[step%notes.length]; o1.frequency.setValueAtTime(base*Math.pow(2,n/12), audioCtx.currentTime); o2.frequency.setValueAtTime(base*2*Math.pow(2,((n+7)%24)/12), audioCtx.currentTime); setTimeout(tick, 350); } o1.start(); o2.start(); musicNode={stop:()=>{ try{o1.stop();o2.stop();}catch{}}}; musicOn=true; tick(); UI('btnMusic').textContent='Music: On'; }
+    function toggleMusic(){ if(!audioCtx) initAudio(); if(musicOn){ musicOn=false; if(musicNode){ musicNode.stop(); musicNode=null; } UI('btnMusic').textContent='Music: Off'; } else { musicOn=true; startMusic(); } }
+    UI('btnMusic').onclick = ()=>{ initAudio(); toggleMusic(); };
+
+    // SFX helpers bound to events
+    const SFX = { place:()=>beep(660,0.06), sell:()=>beep(330,0.06), upgrade:()=>beep(990,0.07), shoot:()=>beep(740,0.03), laser:()=>beep(1200,0.02), zap:()=>beep(880,0.03), boom:()=>{noiseHit();}, ui:()=>beep(520,0.04) };
+
+    // ====== Difficulty ======
+    const DIFF = {
+      easy:{ hpMul:0.85, spdMul:0.95, rewardMul:1.15, label:'Relaxed' },
+      normal:{ hpMul:1.0, spdMul:1.0, rewardMul:1.0, label:'Balanced' },
+      hard:{ hpMul:1.25, spdMul:1.1, rewardMul:0.9, label:'Challenging' }
+    };
+
+    // ====== Skill Tree ======
+    const SKILLS = [
+      {id:'dmg1', name:'Sharper Tips', desc:'+10% tower damage', apply: s=>s.mods.dmg+=0.10 },
+      {id:'rng1', name:'Wider Scopes', desc:'+10% tower range', apply: s=>s.mods.range+=0.10 },
+      {id:'spd1', name:'Faster Gears', desc:'-10% cooldowns', apply: s=>s.mods.cd-=0.10 },
+      {id:'eco1', name:'Goldsmith', desc:'+10% gold per kill', apply: s=>s.mods.gold+=0.10 },
+      {id:'hero1', name:'Hero Aura+', desc:'+5% hero boost radius', apply: s=>s.mods.heroR+=0.05 },
+    ];
+
+    function renderSkills(){ const wrap=UI('skills'); wrap.innerHTML=''; SKILLS.forEach(sk=>{ const owned = G.skills.has(sk.id); const btn=document.createElement('button'); btn.className='button'; btn.textContent = owned? 'Owned' : 'Unlock'; btn.disabled = owned || G.skillPts<=0; btn.onclick=()=>{ if(G.skillPts>0&&!owned){ G.skillPts--; G.skills.add(sk.id); sk.apply(G); updateSkillMods(); renderSkills(); log(`Skill unlocked: ${sk.name}`); SFX.ui(); } }; const row=document.createElement('div'); row.className='skill'; row.innerHTML=`<div><div class="title">${sk.name}</div><div class="hint">${sk.desc}</div></div>`; row.appendChild(btn); wrap.appendChild(row); }); UI('skillPts').textContent = G.skillPts; }
+
+    function updateSkillMods(){ G.mods = {dmg:0, range:0, cd:0, gold:0, heroR:0}; SKILLS.forEach(sk=>{ if(G.skills.has(sk.id)) sk.apply(G); }); }
+
+    // ====== Maps / Paths ======
+    function defaultPath(){ return [ {x:1,y:6},{x:6,y:6},{x:6,y:12},{x:14,y:12},{x:14,y:6},{x:22,y:6},{x:26,y:8},{x:28,y:10} ]; }
+    function randomPath(){
+      const pts=[]; let x=1, y=Math.floor(Math.random()*(ROWS-4))+2; pts.push({x,y}); while(x<COLS-2){ const dir = Math.random()<0.6? 'r' : (Math.random()<0.5? 'u':'d'); if(dir==='r') x+=Math.floor(Math.random()*3)+2; else if(dir==='u') y=Math.max(1, y- (Math.random()<0.5?1:2)); else y=Math.min(ROWS-2, y+(Math.random()<0.5?1:2)); x=Math.min(COLS-2,x); pts.push({x,y}); } return pts; }
+
+    let MAPS = JSON.parse(localStorage.getItem(MAPS_KEY)||'[]'); if(MAPS.length===0){ MAPS.push(defaultPath()); localStorage.setItem(MAPS_KEY, JSON.stringify(MAPS)); }
+    let mapIndex=0;
+    function currentPath(){ return MAPS[mapIndex%MAPS.length]; }
+
+    // ====== Game State ======
+    const stateDefaults = () => ({
+      gold: 180,
+      hp: 20,
+      wave: 0,
+      towers: [],
+      heroes: [
+        {id:'hero1', name:'Lyra', x: TILE*5+TILE/2, y: TILE*5+TILE/2, r: 80, boost: 0.10, atkRange: 150, atkDmg: 10, cd: 0.5, cdLeft:0, color:'#6be7ff'},
+      ],
+      traps: [],
+      projectiles: [],
+      enemies: [],
+      particles: [],
+      placing: null,
+      selectedId: null,
+      lastSpawn: 0,
+      spawnLeft: 0,
+      time: 0,
+      diff: 'normal',
+      skillPts: 0,
+      skills: new Set(),
+      mods: {dmg:0, range:0, cd:0, gold:0, heroR:0},
+    });
+
+    let G = stateDefaults();
+    // ensure convenience pointer for single hero
+    function ensureHeroRef(){ if(G.heroes && G.heroes.length>0) G.hero = G.heroes[0]; else { G.heroes=[{id:'hero1', name:'Lyra', x: TILE*5+TILE/2, y: TILE*5+TILE/2, r: 80, boost:0.10, atkRange:150, atkDmg:10, cd:0.5, cdLeft:0, color:'#6be7ff'}]; G.hero = G.heroes[0]; } }
+    ensureHeroRef();
+
+    // ====== Utility ======
+    const rand = (a,b)=>a+Math.random()*(b-a);
+    function log(msg){ const el=UI('log'); const p=document.createElement('div'); p.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`; el.prepend(p); }
+    function toTile(x){return Math.floor(x/TILE)}
+    function tileCenter(tx,ty){return {x:tx*TILE+TILE/2, y:ty*TILE+TILE/2}}
+
+    function rebuildPathTiles(){ pathTiles = new Set(currentPath().map(p=>`${p.x},${p.y}`)); }
+    let pathTiles = new Set(); rebuildPathTiles();
+    function isPathTile(tx,ty){ return pathTiles.has(`${tx},${ty}`); }
+
+    function tileFree(tx,ty){ if(tx<0||ty<0||tx>=COLS||ty>=ROWS) return false; const occupied = G.towers.some(t=>toTile(t.x)===tx && toTile(t.y)===ty); return !occupied && !isPathTile(tx,ty); }
+    function tileFreeForTrap(tx,ty){ if(tx<0||ty<0||tx>=COLS||ty>=ROWS) return false; const occupied = G.towers.some(t=>toTile(t.x)===tx && toTile(t.y)===ty); return !occupied && isPathTile(tx,ty); }
+
+    // ====== Towers (expanded) ======
+    const TOWERS = {
+      archer: {name:'Archer', cost:60, range:120, cd:0.75, dmg:12, color:'#72f5a0'},
+      cannon: {name:'Cannon', cost:90, range:110, cd:1.1, dmg:22, splash:100, color:'#ffcc88'},
+      laser:  {name:'Laser',  cost:120, range:140, cd:0.10, dmg:4, beam:true, color:'#9fd1ff'},
+      tesla:  {name:'Tesla',  cost:150, range:130, cd:1.4, dmg:16, chain:2, color:'#b993ff'},
+      trap:   {name:'Stasis Trap', cost:50, range:50, cd:2.0, dmg:0, slow:0.5, duration:1.5, color:'#ff8899', pathOnly:true},
+      poison: {name:'Poison', cost:100, range:120, cd:1.0, dmg:6, dot:6, dotTime:3.0, color:'#6bff8a'},
+      frost:  {name:'Frost',  cost:110, range:120, cd:1.2, dmg:8, slow:0.4, slowTime:2.5, color:'#a8e4ff'},
+      mortar: {name:'Mortar', cost:160, range:200, cd:1.8, dmg:30, splash:90, arc:true, color:'#ffb07c'},
+      rail:   {name:'Railgun',cost:200, range:220, cd:1.6, dmg:26, pierce:true, color:'#e3f0ff'},
+    };
+    function towerPrice(base, level){ return Math.floor(base * Math.pow(1.55, level-1)); }
+
+    // Build menu
+    const shop = UI('shop');
+    function renderShop(){ shop.innerHTML=''; Object.entries(TOWERS).forEach(([key,t])=>{ const div=document.createElement('div'); div.className='card'; const tag = t.beam? 'Beam' : t.splash? (t.arc? 'Arcing AoE':'Splash') : t.chain? 'Chain' : t.pierce? 'Pierce' : t.dot? 'Poison DOT' : t.slow? 'Slow' : t.pathOnly? 'Trap' : 'Single'; div.innerHTML = `<div class="title">${t.name}</div><div class="desc">${tag}<br><span class="price">Cost: ${t.cost}</span></div><button class="button build" data-type="${key}">Build</button>`; shop.appendChild(div); }); }
+    renderShop();
+    shop.addEventListener('click', (e)=>{ const btn=e.target.closest('.build'); if(!btn) return; const type=btn.dataset.type; if(G.gold < TOWERS[type].cost){ log('Not enough gold.'); return; } G.placing={type}; SFX.ui(); log(`Placing ${TOWERS[type].name}. Click a tile.`); });
+
+    // ====== Selection / Upgrade / Sell ======
+    function updateSelected(){
+  const el=UI('selected');
+  const t=G.towers.find(x=>x.id===G.selectedId);
+  if(!t){
+    el.textContent='Nothing selected.';
+    UI('btnUpgrade').disabled = true;
+    UI('btnSell').disabled = true;
+    return;
+  }
+  const base=TOWERS[t.type];
+  const nextCost=towerPrice(base.cost, t.level+1);
+  const rng=Math.round(base.range*(1+heroBoostAt(t.x,t.y))*(1+G.mods.range));
+  const dmg = towerDmg(base,t);
+  el.innerHTML = `${base.name} • Lv.${t.level}<br>Range: ${rng} • Dmg: ${dmg}<br><span class="price">Upgrade cost: ${nextCost}</span>`;
+  UI('btnUpgrade').disabled = false;
+  UI('btnSell').disabled = false;
+}
+    function doUpgrade(){ const t=G.towers.find(x=>x.id===G.selectedId); if(!t) return; const base=TOWERS[t.type]; const cost=towerPrice(base.cost, t.level+1); if(G.gold<cost){ log('Not enough gold.'); return; } t.level++; G.gold-=cost; SFX.upgrade(); log(`${base.name} upgraded to Lv.${t.level}.`); updateSelected(); }
+    function doSell(){ const idx=G.towers.findIndex(x=>x.id===G.selectedId); if(idx<0) return; const t=G.towers[idx]; const base=TOWERS[t.type]; let paid=0; for(let lv=1; lv<=t.level; lv++){ paid += towerPrice(base.cost, lv);} const refund=Math.floor(paid*0.5); G.gold+=refund; if(t.type==='trap') G.traps=G.traps.filter(id=>id!==t.id); G.towers.splice(idx,1); G.selectedId=null; updateSelected(); SFX.sell(); log(`Sold ${base.name} for ${refund}.`); }
+    UI('btnUpgrade').onclick=doUpgrade; UI('btnSell').onclick=doSell; window.addEventListener('keydown', e=>{ if(e.key==='u'||e.key==='U') doUpgrade(); if(e.key==='s'||e.key==='S') doSell(); });
+
+    // ====== Mouse/Placement/Hero ======
+    const mouse={x:0,y:0}; let draggingHeroIdx=-1;
+    cvs.addEventListener('mousemove', e=>{ const r=cvs.getBoundingClientRect(); mouse.x=e.clientX-r.left; mouse.y=e.clientY-r.top; if(draggingHeroIdx>=0){ G.heroes[draggingHeroIdx].x=mouse.x; G.heroes[draggingHeroIdx].y=mouse.y; ensureHeroRef(); }});
+    cvs.addEventListener('contextmenu', e=>{ e.preventDefault(); G.placing=null; });
+
+    cvs.addEventListener('mousedown', e=>{
+      const r=cvs.getBoundingClientRect();
+      const x=e.clientX-r.left, y=e.clientY-r.top;
+      const tx=toTile(x), ty=toTile(y);
+      if(e.button===2){ // right click: cancel placing / deselect
+        G.placing=null;
+        G.selectedId=null; updateSelected();
+        return;
+      }
+      // check if clicked on hero
+      for(let i=0;i<G.heroes.length;i++){
+        const h=G.heroes[i];
+        if(Math.hypot(h.x-x,h.y-y) < 12){ draggingHeroIdx = i; return; }
+      }
+      // place tower if we have placing
+      if(G.placing){
+        const base = TOWERS[G.placing.type];
+        const ok = (G.placing.type==='trap')? tileFreeForTrap(tx,ty) : tileFree(tx,ty);
+        if(!ok){ log('Cannot place there.'); G.placing=null; return; }
+        if(G.gold < base.cost){ log('Not enough gold.'); G.placing=null; return; }
+        const c = tileCenter(tx,ty);
+        const id = 't'+(Date.now().toString(36))+Math.floor(Math.random()*1000);
+        const tObj = { id, type: G.placing.type, x: c.x, y: c.y, level:1, cd:0 };
+        G.towers.push(tObj);
+        if(G.placing.type==='trap') G.traps.push(id);
+        G.gold -= base.cost;
+        G.placing = null;
+        SFX.place(); log(`Built ${base.name}.`);
+        return;
+      }
+      // selection: find tower under cursor
+      const sel = G.towers.find(t=>Math.hypot(t.x-x,t.y-y) < 16);
+      if(sel){
+    G.selectedId = sel.id;
+    updateSelected();
+    UI('btnUpgrade').disabled = false;
+    UI('btnSell').disabled = false;
+    SFX.ui();
+    return;
+  }
+      // else check map editor / nothing -> deselect
+      G.selectedId=null; updateSelected();
+    });
+    window.addEventListener('mouseup', ()=>{ draggingHeroIdx=-1; });
+
+    // ====== Missing helper functions (implemented) ======
+    function drawGrid(){
+      ctx.save();
+      ctx.strokeStyle='#0f1530';
+      ctx.lineWidth=1;
+      for(let i=0;i<=COLS;i++){ ctx.beginPath(); ctx.moveTo(i*TILE,0); ctx.lineTo(i*TILE,cvs.height); ctx.stroke(); }
+      for(let j=0;j<=ROWS;j++){ ctx.beginPath(); ctx.moveTo(0,j*TILE); ctx.lineTo(cvs.width,j*TILE); ctx.stroke(); }
+      ctx.restore();
+    }
+
+    // simple enemy spawn/advance/kill
+    function spawnEnemy(){
+      const p0 = currentPath()[0];
+      const pos = tileCenter(p0.x,p0.y);
+      const hpBase = Math.round(40 + G.wave*8);
+      const spdBase = 40 * DIFF[G.diff].spdMul;
+      const e = { x: pos.x, y: pos.y, i:0, t:0, hp: hpBase, maxhp:hpBase, spd: spdBase, slowTimer:0, dotT:0, dotDmg:0, reward: Math.max(6,Math.round((hpBase/6)*DIFF[G.diff].rewardMul)) };
+      G.enemies.push(e);
+    }
+    function advanceEnemy(e, dt){
+      const path = currentPath();
+      const idx = e.i;
+      if(idx >= path.length-1){ // reached end -> damage base
+        e.hp = -9999; // mark to remove
+        G.hp -= 1;
+        log('Enemy breached your defenses! Base HP -1');
+        return;
+      }
+      const next = tileCenter(path[idx+1].x, path[idx+1].y);
+      const dx = next.x - e.x, dy = next.y - e.y;
+      const dist = Math.hypot(dx,dy);
+      if(dist < 4){ e.i++; return; }
+      const slow = e.slowTimer > 0 ? 0.5 : 1.0;
+      const spd = e.spd * slow * DIFF[G.diff].spdMul;
+      e.x += (dx/dist) * spd * dt;
+      e.y += (dy/dist) * spd * dt;
+      e.slowTimer = Math.max(0, e.slowTimer - dt);
+      // DOT
+      if(e.dotT && e.dotDmg){
+        e.t = (e.t || 0) + dt;
+        if(e.t >= 1.0){
+          const dmg = e.dotDmg;
+          e.hp -= dmg;
+          e.t = 0;
+        }
+      }
+    }
+    function killEnemy(e){
+      G.gold += Math.round(e.reward * (1+G.mods.gold));
+      G.particles.push({x:e.x,y:e.y,r:18,life:0.4});
+      SFX.boom();
+      // grant skillpts occasionally
+      if(Math.random() < 0.05) { G.skillPts++; UI('skillPts').textContent = G.skillPts; }
+    }
+
+    // simple tower/projectile helpers
+    function shootAt(t, target, dmg){
+      // instantaneous hit (small projectile)
+      G.projectiles.push({x:t.x,y:t.y,tx:target.x,ty:target.y,dmg,life:1,r:3,type:'bullet'});
+      // apply immediate damage for simplicity on arrival in updateProjectiles
+    }
+    function updateProjectiles(){
+      for(let i=G.projectiles.length-1;i>=0;i--){
+        const p = G.projectiles[i];
+        const dx = p.tx - p.x, dy = p.ty - p.y; const dist = Math.hypot(dx,dy);
+        const speed = 600;
+        if(dist < 4){ // impact: find enemy at that location (closest)
+          let best=null, bd=1e6;
+          for(const e of G.enemies){ const d=Math.hypot(e.x-p.tx,e.y-p.ty); if(d<bd){ bd=d; best=e; } }
+          if(best && bd < 20){ best.hp -= p.dmg; if(best.hp<=0) killEnemy(best); }
+          G.projectiles.splice(i,1);
+          G.particles.push({x:p.tx,y:p.ty,r:6,life:0.18});
+        } else {
+          const nx = (dx/dist)*Math.min(dist, speed*(1/60));
+          p.x += nx*(1/60)*60; // normalized step (keeps simple)
+          p.y += (dy/dist)*Math.min(dist, speed*(1/60));
+        }
+      }
+    }
+
+    // tower stat helpers
+    function heroBoostAt(x,y){
+      if(!G.hero) return 0;
+      const d = Math.hypot(G.hero.x - x, G.hero.y - y);
+      return d <= G.hero.r*(1+G.mods.heroR) ? G.hero.boost : 0;
+    }
+    function towerDmg(base,t){ return Math.round((base.dmg + (t.level-1)*4) * (1+G.mods.dmg)); }
+    function towerRange(base,t){ return Math.round(base.range * (1 + G.mods.range) * (1 + heroBoostAt(t.x,t.y))); }
+    function towerCd(base){ return Math.max(0.02, base.cd * Math.max(0.1, 1 + G.mods.cd)); }
+    function lineDamage(x1,y1,x2,y2,dmg){
+      // instant line damage: apply to first enemy close to line
+      for(const e of G.enemies){
+        const px = e.x, py=e.y;
+        const l2 = ((x2-x1)**2 + (y2-y1)**2) || 1;
+        const t = Math.max(0, Math.min(1, ((px-x1)*(x2-x1) + (py-y1)*(y2-y1)) / l2));
+        const projx = x1 + t*(x2-x1), projy = y1 + t*(y2-y1);
+        const dist = Math.hypot(px-projx, py-projy);
+        if(dist < 14){ e.hp -= dmg; if(e.hp<=0) killEnemy(e); }
+      }
+    }
+
+    // ====== Spawn / Wave control ======
+    function startWave(){
+      if(G.spawnLeft>0) return;
+      G.wave++; UI('wave').textContent = G.wave;
+      const count = 6 + Math.floor(G.wave * 1.4);
+      G.spawnLeft = count;
+      G.lastSpawn = G.time;
+      log(`Wave ${G.wave} started. ${count} enemies incoming.`);
+    }
+    UI('btnStart').onclick = startWave;
+
+    // ====== Game Loop ======
+    let lastT=performance.now(); let fps=0,fpsAcc=0,fpsCount=0;
+    function tick(now){
+      const dt=Math.min(0.05,(now-lastT)/1000);
+      lastT=now; G.time+=dt;
+      fpsAcc += (1/dt); fpsCount++; if(fpsCount>=10){ fps=Math.round(fpsAcc/fpsCount); fpsAcc=0; fpsCount=0; UI('fps').textContent=fps; }
+
+      if(G.spawnLeft>0){
+        if(G.time - G.lastSpawn > 0.6){
+          spawnEnemy(); G.spawnLeft--; G.lastSpawn = G.time;
+        }
+      }
+      // enemies update
+      for(let i=G.enemies.length-1;i>=0;i--){ const e=G.enemies[i]; if(e.hp>0) advanceEnemy(e,dt); if(e.hp<=0){ G.enemies.splice(i,1);} }
+      // towers: cooldowns and attacks
+      for(const t of G.towers){
+        if(t.type==='trap') continue;
+        const base=TOWERS[t.type];
+        t.cd = Math.max(0, t.cd - dt);
+        const range = towerRange(base,t);
+        // select nearest enemy
+        let target=null, td=1e9;
+        for(const e of G.enemies){ const d = Math.hypot(e.x-t.x,e.y-t.y); if(d<range && d<td){ td=d; target=e; } }
+        if(target && t.cd<=0){
+          const dmg = towerDmg(base,t);
+          if(base.beam){
+            target.hp -= dmg * dt * 3; // beam does continuous damage scaled by dt
+            if(target.hp<=0) killEnemy(target);
+            G.particles.push({line:[t.x,t.y,target.x,target.y], life:0.04, color:base.color});
+            SFX.laser();
+          } else if(base.pierce){
+            const dx = target.x - t.x, dy = target.y - t.y;
+            const nx = t.x + dx*1.1, ny = t.y + dy*1.1;
+            lineDamage(t.x,t.y,nx,ny,dmg);
+            G.particles.push({zap:[t.x,t.y,nx,ny], life:0.06, color:base.color});
+            SFX.zap();
+          } else if(base.arc){
+            const aimx = target.x + rand(-20,20), aimy = target.y + rand(-20,20);
+            G.projectiles.push({x:t.x,y:t.y,tx:aimx,ty:aimy,dmg:dmg,r:4,speed:5,type:t.type});
+            SFX.shoot();
+          } else if(base.splash){
+            // splash: damage target + others on impact (we'll handle on projectile)
+            shootAt(t,target,dmg);
+            SFX.shoot();
+          } else {
+            shootAt(t,target,dmg);
+            SFX.shoot();
+          }
+          t.cd = towerCd(base) / (1 + heroBoostAt(t.x,t.y));
+        }
+
+        // Tower Range (selected or placing)
+
+      }
+
+      // traps periodic
+      for(const t of G.towers.filter(x=>x.type==='trap')){
+        const base = TOWERS['trap'];
+        t.cd = (t.cd || 0) - dt;
+        if(t.cd <= 0){
+          for(const e of G.enemies){
+            if(e.hp>0 && Math.hypot(e.x-t.x,e.y-t.y) <= base.range){
+              e.slowTimer = Math.max(e.slowTimer, base.duration);
+            }
+          }
+          t.cd = base.cd;
+        }
+      }
+
+      // hero automatic small attack (support)
+      heroesFire(dt);
+
+      updateProjectiles();
+
+      // draw
+      ctx.clearRect(0,0,cvs.width,cvs.height);
+      drawGrid(); drawPath();
+
+      // draw path tiles
+      G.towers.forEach(t=>{ /* reserved */ });
+
+      // towers
+      for(const t of G.towers){
+        if(t.type==='trap') continue;
+        ctx.save(); ctx.translate(t.x,t.y); ctx.fillStyle = TOWERS[t.type].color;
+        if(t.type==='archer'){ ctx.beginPath(); ctx.moveTo(0,-10); ctx.lineTo(10,10); ctx.lineTo(-10,10); ctx.closePath(); ctx.fill(); }
+        else if(t.type==='cannon'){ ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill(); ctx.fillRect(-3,-18,6,14); }
+        else if(t.type==='laser'){ ctx.fillRect(-8,-8,16,16); }
+        else if(t.type==='tesla'){ ctx.beginPath(); ctx.moveTo(-10,10); ctx.lineTo(0,-10); ctx.lineTo(10,10); ctx.closePath(); ctx.fill(); }
+        else if(t.type==='poison'){ ctx.beginPath(); ctx.arc(0,0,9,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#0b2'; ctx.fillRect(-2,-16,4,12); }
+        else if(t.type==='frost'){ ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(12,12); ctx.lineTo(-12,12); ctx.closePath(); ctx.fill(); }
+        else if(t.type==='mortar'){ ctx.beginPath(); ctx.arc(0,0,12,0,Math.PI*2); ctx.fill(); ctx.fillRect(-4,-20,8,16); }
+        else if(t.type==='rail'){ ctx.fillRect(-6,-12,12,24); }
+        if(G.selectedId===t.id){ ctx.strokeStyle="#e8ebff"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,16,0,Math.PI*2); ctx.stroke(); }
+        ctx.restore();
+      }
+
+      // traps
+      for(const t of G.towers.filter(x=>x.type==='trap')){
+        ctx.fillStyle = TOWERS['trap'].color; ctx.globalAlpha=0.95;
+        ctx.beginPath(); ctx.arc(t.x,t.y,6,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+      }
+
+      // projectiles
+      ctx.fillStyle='#f5f8ff';
+      for(const p of G.projectiles){ ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill(); }
+
+      // particles
+      for(const pr of G.particles){
+        if(pr.line){ ctx.globalAlpha=Math.max(0,pr.life/0.06); ctx.strokeStyle=pr.color||'#9fd1ff'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(pr.line[0],pr.line[1]); ctx.lineTo(pr.line[2],pr.line[3]); ctx.stroke(); ctx.globalAlpha=1; }
+        else if(pr.zap){ ctx.globalAlpha=Math.max(0,pr.life/0.08); ctx.strokeStyle=pr.color||'#b993ff'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(pr.zap[0],pr.zap[1]); ctx.lineTo(pr.zap[2],pr.zap[3]); ctx.stroke(); ctx.globalAlpha=1; }
+        else { ctx.globalAlpha=Math.max(0,pr.life/0.18); ctx.fillStyle='rgba(255,200,120,0.35)'; ctx.beginPath(); ctx.arc(pr.x,pr.y,pr.r,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
+        pr.life -= dt;
+      }
+      // cleanup particles
+      G.particles = G.particles.filter(p => p.life > 0);
+
+      // hero draw
+      if(G.hero){
+        ctx.fillStyle=G.hero.color||'#6be7ff'; ctx.beginPath(); ctx.arc(G.hero.x,G.hero.y,10,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=0.12; ctx.strokeStyle=G.hero.color||'#6be7ff'; ctx.beginPath(); ctx.arc(G.hero.x,G.hero.y,G.hero.r*(1+G.mods.heroR),0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1;
+      }
+
+      // enemies draw
+      for(const e of G.enemies){
+        ctx.fillStyle='#ff7b7b'; ctx.beginPath(); ctx.arc(e.x,e.y,8,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#222a48'; ctx.fillRect(e.x-10,e.y-14,20,3);
+        ctx.fillStyle='#6bff9b'; const hpw = Math.max(0,(e.hp/e.maxhp)*20); ctx.fillRect(e.x-10,e.y-14,hpw,3);
+      }
+
+        if(G.selectedId){
+      const t = G.towers.find(tt=>tt.id===G.selectedId);
+      if(t){
+        const base = TOWERS[t.type];
+        const rng = towerRange(base,t);
+        ctx.beginPath();
+        ctx.arc(t.x,t.y,rng,0,Math.PI*2);
+        ctx.strokeStyle='rgba(255,255,255,0.2)';
+        ctx.lineWidth=2;
+        ctx.stroke();
+      }
+    }
+    if(G.placing){
+    const base = TOWERS[G.placing.type];
+    ctx.save();
+    ctx.globalAlpha=0.6;
+    ctx.translate(mouse.x,mouse.y);
+    ctx.fillStyle = base.color;
+    ctx.beginPath();
+    ctx.arc(0,0,10,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+
+      UI('gold').textContent = G.gold;
+      UI('hp').textContent = G.hp;
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    // ====== Intro Buttons & Load ======
+    function saveGame(){
+      try{
+        const save = {...G};
+        // convert sets, functions, circular refs
+        save.skills = [...G.skills];
+        save.heroes = G.heroes;
+        save.towers = G.towers;
+        save.enemies = []; save.projectiles = []; save.particles = [];
+        localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+        log('Game saved.');
+      }catch(e){ log('Save failed: '+e.message); }
+    }
+    function loadGame(){
+      const s = localStorage.getItem(SAVE_KEY);
+      if(!s) return false;
+      try{
+        const data = JSON.parse(s);
+        G = stateDefaults();
+        // merge important values
+        G.gold = data.gold||G.gold;
+        G.hp = data.hp||G.hp;
+        G.wave = data.wave||G.wave;
+        G.towers = data.towers||G.towers;
+        G.heroes = data.heroes && data.heroes.length>0 ? data.heroes : G.heroes;
+        G.traps = data.traps || [];
+        G.skillPts = data.skillPts||G.skillPts;
+        G.skills = new Set(data.skills||[]);
+        updateSkillMods();
+        rebuildPathTiles();
+        ensureHeroRef();
+        log('Game loaded.');
+        return true;
+      }catch(e){ log('Load failed: '+e.message); return false; }
+    }
+    function postLoad(){
+      updateSkillMods();
+      renderSkills();
+      ensureHeroRef();
+    }
+    UI('btnSave').onclick = saveGame;
+    UI('btnLoad').onclick = ()=>{ const ok = loadGame(); if(ok) postLoad(); };
+    UI('btnNew').onclick = ()=>{ G = stateDefaults(); rebuildPathTiles(); updateSkillMods(); renderSkills(); ensureHeroRef(); log('New game started.'); };
+
+    // ====== Map Navigation ======
+    UI('btnNextMap').onclick=()=>{ mapIndex=(mapIndex+1)%MAPS.length; rebuildPathTiles(); log(`Switched to map ${mapIndex+1}/${MAPS.length}`); SFX.ui(); };
+    UI('btnRandMap').onclick=()=>{ MAPS[mapIndex]=randomPath(); rebuildPathTiles(); log('Generated random path for current map.'); SFX.ui(); };
+
+    // ====== Map Editor ======
+    const editorModal=UI('editorModal'); const edCvs=UI('editorCanvas'); const edCtx=edCvs.getContext('2d');
+    const scaleX = cvs.width/edCvs.width, scaleY = cvs.height/edCvs.height;
+    function openEditor(){ editorModal.style.display='flex'; edPath = currentPath().map(p=>({...p})); drawEditor(); }
+    function closeEditor(){ editorModal.style.display='none'; rebuildPathTiles(); }
+    UI('btnEditor').onclick=openEditor; UI('openEditorBtn').onclick=()=>{ document.getElementById('intro').style.display='none'; openEditor(); };
+
+    let edPath = currentPath().map(p=>({...p})); let dragIdx=-1;
+    function edToCanvas(pt){ return {x: pt.x*TILE/scaleX, y: pt.y*TILE/scaleY}; }
+    function canvasToTile(x,y){ return {x: Math.max(0,Math.min(COLS-1, Math.round((x*scaleX)/TILE))), y: Math.max(0,Math.min(ROWS-1, Math.round((y*scaleY)/TILE)))}; }
+    function drawEditor(){
+      edCtx.clearRect(0,0,edCvs.width,edCvs.height); edCtx.fillStyle='#0c1228'; edCtx.fillRect(0,0,edCvs.width,edCvs.height);
+      edCtx.strokeStyle='#38476f'; edCtx.lineWidth=18; edCtx.lineCap='round';
+      edCtx.beginPath(); if(edPath.length>0){ let c=edToCanvas(edPath[0]); edCtx.moveTo(c.x,c.y); for(let i=1;i<edPath.length;i++){ c=edToCanvas(edPath[i]); edCtx.lineTo(c.x,c.y);} edCtx.stroke(); }
+      edPath.forEach((p,i)=>{ const c=edToCanvas(p); edCtx.fillStyle=i===0?'#6bff9b': (i===edPath.length-1?'#ff9b9b':'#9ab2ff'); edCtx.beginPath(); edCtx.arc(c.x,c.y,6,0,Math.PI*2); edCtx.fill(); });
+    }
+    edCvs.addEventListener('mousedown', e=>{ const r=edCvs.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top; if(e.button===2){ // delete nearest point
+        let idx=-1, best=20; edPath.forEach((p,i)=>{ const c=edToCanvas(p); const d=Math.hypot(c.x-x,c.y-y); if(d<best){ best=d; idx=i; } }); if(idx>0 && idx<edPath.length-1){ edPath.splice(idx,1); drawEditor(); } return; }
+      // try grab
+      dragIdx=-1; for(let i=0;i<edPath.length;i++){ const c=edToCanvas(edPath[i]); if(Math.hypot(c.x-x,c.y-y)<10){ dragIdx=i; break; } }
+      if(dragIdx===-1){ // add point
+        const t=canvasToTile(x,y); edPath.push({x:t.x,y:t.y}); edPath.sort((a,b)=>a.x-b.x); }
+      drawEditor(); });
+    edCvs.addEventListener('mousemove', e=>{ if(dragIdx>=0){ const r=edCvs.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top; const t=canvasToTile(x,y); edPath[dragIdx]=t; drawEditor(); } });
+    window.addEventListener('mouseup', ()=>{ dragIdx=-1; });
+    edCvs.addEventListener('contextmenu', e=>e.preventDefault());
+
+    UI('edDone').onclick=()=>{ MAPS[mapIndex]=edPath.map(p=>({...p})); localStorage.setItem(MAPS_KEY, JSON.stringify(MAPS)); closeEditor(); SFX.ui(); };
+    UI('edClear').onclick=()=>{ edPath=[{x:1,y:2},{x:3,y:2}]; drawEditor(); };
+    UI('edLoad').onclick=()=>{ edPath=currentPath().map(p=>({...p})); drawEditor(); };
+    UI('edSave').onclick=()=>{ MAPS[mapIndex]=edPath.map(p=>({...p})); localStorage.setItem(MAPS_KEY, JSON.stringify(MAPS)); SFX.ui(); };
+    UI('edRandom').onclick=()=>{ edPath=randomPath(); drawEditor(); };
+
+    // ====== Helpers for drawing path and grid ======
+    function drawPath(){
+      const p = currentPath();
+      if(!p || p.length===0) return;
+      ctx.save();
+      ctx.strokeStyle='#38476f'; ctx.lineWidth = TILE-6; ctx.lineCap='round';
+      ctx.beginPath(); const c0=tileCenter(p[0].x,p[0].y); ctx.moveTo(c0.x,c0.y);
+      for(let i=1;i<p.length;i++){ const c=tileCenter(p[i].x,p[i].y); ctx.lineTo(c.x,c.y); }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // ====== Hero AI (support fire) ======
+    function heroesFire(dt){
+      if(!G.hero) return;
+      G.hero.cdLeft = (G.hero.cdLeft || 0) - dt;
+      if(G.hero.cdLeft <= 0){
+        // find nearest enemy
+        let best=null, bd=1e9;
+        for(const e of G.enemies){ const d=Math.hypot(e.x-G.hero.x,e.y-G.hero.y); if(d < G.hero.atkRange && d < bd){ bd=d; best=e; } }
+        if(best){
+          best.hp -= G.hero.atkDmg;
+          SFX.shoot();
+          if(best.hp<=0) killEnemy(best);
+        }
+        G.hero.cdLeft = G.hero.cd;
+      }
+    }
+
+    // ====== PWA: manifest + service worker via Blob ======
+    const manifest = { name:"ORIGIN TD", short_name:"ORIGIN TD", start_url:".", display:"standalone", background_color:"#0f1223", theme_color:"#0f1223", icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23111235'/%3E%3Ccircle cx='50' cy='50' r='28' fill='%2372f5a0'/%3E%3C/svg%3E", sizes:"512x512", type:"image/svg+xml"}] };
+    const manifestBlob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+    const manifestURL = URL.createObjectURL(manifestBlob); document.getElementById('manifestLink').setAttribute('href', manifestURL);
+    const swCode = `
+self.addEventListener('install', e=>{ e.waitUntil(caches.open('origin-td-v1').then(c=>c.addAll(['./']))); self.skipWaiting(); });
+self.addEventListener('activate', e=>{ e.waitUntil(self.clients.claim()); });
+self.addEventListener('fetch', e=>{ e.respondWith(caches.match(e.request).then(r=> r || fetch(e.request).then(res=>{ const copy = res.clone(); caches.open('origin-td-v1').then(c=>c.put(e.request, copy)); return res; }))); });`;
+    const swBlob = new Blob([swCode], {type:'text/javascript'});
+    const swURL = URL.createObjectURL(swBlob);
+    let deferredPrompt=null; window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferredPrompt=e; });
+    UI('installBtn').onclick = async ()=>{ try{ if('serviceWorker' in navigator){ await navigator.serviceWorker.register(swURL); } if(deferredPrompt){ deferredPrompt.prompt(); } }catch(err){ console.log(err); } };
+
+    // ====== Initialize UI and behaviors ======
+    // difficulty buttons
+    document.querySelectorAll('.diff').forEach(btn=>{ btn.onclick = ()=>{ G.diff = btn.dataset.d; UI('diffLabel').textContent = DIFF[G.diff].label; log('Difficulty set to '+DIFF[G.diff].label); SFX.ui(); }; });
+    // set initial values
+    UI('diffLabel').textContent = DIFF[G.diff].label;
+    renderSkills();
+    updateSkillMods();
+    postLoad();
+    rebuildPathTiles();
+
+    // show intro modal
+    document.getElementById('intro').style.display = 'flex';
+    UI('continueBtn').onclick=()=>{ initAudio(); startMusic(); if(!loadGame()){ G=stateDefaults(); updateSkillMods(); renderSkills(); postLoad(); } document.getElementById('intro').style.display='none'; };
+    UI('newBtn').onclick=()=>{ initAudio(); startMusic(); G=stateDefaults(); updateSkillMods(); renderSkills(); postLoad(); document.getElementById('intro').style.display='none'; };
+
+    // misc helper: ensure map tiles exist for rendering
+    window.addEventListener('resize', ()=>{ /* stub in case of dynamic resize */ });
+
+  })();
+  </script>
+</body>
+</html>
